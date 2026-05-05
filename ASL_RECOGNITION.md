@@ -16,7 +16,7 @@ The app recognizes the following common ASL signs automatically:
 
 ### Yes/No & Affirmation
 - **YES** - Fist with thumb up, nodding motion
-- **NO** - Index and middle finger pointing up side to side
+- **NO** - Index  finger pointing up side to side
 - **SORRY** - Fist at chest with circular motion
 
 ### Common Requests

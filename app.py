@@ -375,7 +375,7 @@ def admin_dashboard():
 
 @app.route('/admin/users')
 @login_required
-@admin_required
+@admin_required 
 def manage_users():
     """Manage all users"""
     page = request.args.get('page', 1, type=int)
@@ -455,6 +455,57 @@ def delete_user(user_id):
     flash(f'User {username} deleted successfully!', 'success')
     
     return redirect(url_for('manage_users'))
+
+
+@app.route('/api/admin/users/search', methods=['GET'])
+@login_required
+@admin_required
+def search_users():
+    """Search users by name, email, or user ID (API endpoint)"""
+    query_text = request.args.get('q', '').strip()
+    limit = request.args.get('limit', 50, type=int)
+    
+    if not query_text or len(query_text) < 1:
+        return jsonify({'users': [], 'total': 0})
+    
+    # Search across multiple fields with partial matches
+    from sqlalchemy import or_
+    search_query = (
+        User.query.filter(
+            or_(
+                User.username.ilike(f'%{query_text}%'),
+                User.email.ilike(f'%{query_text}%'),
+                User.full_name.ilike(f'%{query_text}%'),
+                User.id == query_text if query_text.isdigit() else False
+            )
+        )
+        .order_by(User.created_at.desc())
+        .limit(limit)
+    )
+    
+    users = search_query.all()
+    
+    # Format results for JSON response
+    results = []
+    for user in users:
+        results.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_active': user.is_active,
+            'created_at': user.created_at.strftime('%Y-%m-%d'),
+            'edit_url': url_for('edit_user', user_id=user.id),
+            'delete_url': url_for('delete_user', user_id=user.id),
+            'current_user': user.id == current_user.id
+        })
+    
+    return jsonify({
+        'users': results,
+        'total': len(results),
+        'query': query_text
+    })
 
 
 @app.route('/admin/transcripts')
