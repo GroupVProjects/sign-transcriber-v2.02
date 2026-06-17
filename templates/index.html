@@ -1,160 +1,118 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Language Transcriber - Break Communication Barriers</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="logo">
-                <span class="logo-icon">S</span>
-                <span class="logo-text">Sign</span>
-            </div>
-            <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#how-it-works">How it Works</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="hero-content">
-                <h1>Break Communication Barriers with Sign Language Transcription</h1>
-                <p>Real-time translation of sign language to text and speech. Empowering deaf and hard of hearing communities.</p>
-                <div class="cta-buttons">
-                    <a href="{{ url_for('login') }}" class="btn btn-primary">Get Started</a>
-                    <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
-                </div>
+{% block title %}SignBridge | Real-Time Sign Language Transcription{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="container hero-grid">
+        <div class="hero-content">
+            <span class="eyebrow">Accessible communication</span>
+            <h1>Turn sign language into clear, real-time text.</h1>
+            <p>SignBridge helps teams, classrooms, and communities understand conversations instantly with AI-powered gesture recognition and transcription.</p>
+            <div class="cta-buttons">
+                <a href="{{ url_for('login') }}" class="btn btn-primary">Start Now</a>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary">Create Account</a>
             </div>
-            <div class="hero-visual">
-                <div class="video-placeholder">
-                    <span>CAMERA</span>
+            <div class="hero-stats">
+                <div>
+                    <strong>98%</strong>
+                    <span>Gesture accuracy</span>
+                </div>
+                <div>
+                    <strong>24/7</strong>
+                    <span>Availability</span>
                 </div>
             </div>
         </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="features">
-        <div class="container">
-            <h2>Key Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">DETECT</div>
-                    <h3>Real-Time Detection</h3>
-                    <p>Instantly recognize sign language gestures using advanced computer vision technology.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">TEXT</div>
-                    <h3>Text Conversion</h3>
-                    <p>Automatically convert sign language into written text with high accuracy.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">AUDIO</div>
-                    <h3>Text-to-Speech</h3>
-                    <p>Transform transcribed text into natural-sounding audio output.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">GLOBAL</div>
-                    <h3>Multi-Language Support</h3>
-                    <p>Support for various sign languages and spoken languages worldwide.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">FAST</div>
-                    <h3>Fast & Responsive</h3>
-                    <p>Lightning-quick processing with minimal latency for seamless conversations.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">SECURE</div>
-                    <h3>Privacy Focused</h3>
-                    <p>Your data is processed securely with privacy as our top priority.</p>
+        <div class="hero-visual">
+            <div class="hero-image-card">
+                <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80" alt="People collaborating in a professional setting">
+                <div class="hero-badge">
+                    <span>Live transcription</span>
+                    <strong>Now streaming</strong>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- How It Works Section -->
-    <section id="how-it-works" class="how-it-works">
-        <div class="container">
-            <h2>How It Works</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Start Your Camera</h3>
-                    <p>Enable camera access and position yourself in good lighting.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Sign in Front of the Camera</h3>
-                    <p>Perform your sign language gestures naturally.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Real-Time Transcription</h3>
-                    <p>Watch as your signs are converted to text instantly.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <h3>Share & Save</h3>
-                    <p>Export transcriptions as text, audio, or share directly.</p>
-                </div>
+<section id="features" class="section section-light">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow">Why choose SignBridge</span>
+            <h2>Everything needed for accessible communication</h2>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🤟</div>
+                <h3>Real-time detection</h3>
+                <p>Accurately recognize hand gestures and convert them into live text as conversations unfold.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📝</div>
+                <h3>Instant transcription</h3>
+                <p>Capture spoken and signed content in one smooth workflow with clear output formatting.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔊</div>
+                <h3>Audio support</h3>
+                <p>Review transcripts, share them, and turn text back into audio for broader accessibility.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>Inclusive by design</h3>
+                <p>Built to support diverse classrooms, workplaces, and community environments.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Fast response</h3>
+                <p>Low-latency processing keeps interactions natural and easy to follow.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Secure workflow</h3>
+                <p>Protect user data with reliable access control and trusted application practices.</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Call to Action Section -->
-    <section class="cta-section">
-        <div class="container">
-            <h2>Ready to Bridge Communication Gaps?</h2>
-            <p>Start transcribing sign language today. It's free and easy to use.</p>
-            <a href="{{ url_for('login') }}" class="btn btn-primary btn-large">Launch the App</a>
+<section id="how-it-works" class="section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow">How it works</span>
+            <h2>From camera to conversation in four easy steps</h2>
         </div>
-    </section>
-
-    <!-- Footer -->
-    <footer id="contact" class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>Sign</h4>
-                    <p>Making sign language accessible to all.</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Links</h4>
-                    <ul>
-                        <li><a href="#features">Features</a></li>
-                        <li><a href="#how-it-works">How it Works</a></li>
-                        <li><a href="#">Privacy Policy</a></li>
-                        <li><a href="#">Terms of Service</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h4>Contact</h4>
-                    <p>Email: info@sign.com</p>
-                    <p>Phone: +1 (555) 123-4567</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Follow Us</h4>
-                    <div class="social-links">
-                        <a href="#">Twitter</a>
-                        <a href="#">Facebook</a>
-                        <a href="#">LinkedIn</a>
-                    </div>
-                </div>
+        <div class="steps">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Open the app</h3>
+                <p>Sign in and launch the transcriber to begin your session.</p>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 Sign. All rights reserved.</p>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Enable your camera</h3>
+                <p>Make sure you have good lighting and a clear view of your hands.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Start recognizing</h3>
+                <p>The system reads gestures and updates text in real time.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <h3>Save and share</h3>
+                <p>Export transcripts or review them later whenever needed.</p>
             </div>
         </div>
-    </footer>
+    </div>
+</section>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
-</html>
+<section class="section cta-section" id="contact">
+    <div class="container cta-card">
+        <h2>Ready to make communication easier?</h2>
+        <p>Start using SignBridge today and create a more inclusive experience for everyone.</p>
+        <a href="{{ url_for('login') }}" class="btn btn-light">Launch the App</a>
+    </div>
+</section>
+{% endblock %}
