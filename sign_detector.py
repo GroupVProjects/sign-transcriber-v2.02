@@ -21,7 +21,7 @@ except Exception as e:
 try:
     from mediapipe.tasks.python import vision
     from mediapipe.tasks.python.core.base_options import BaseOptions
-    from mediapipe.tasks.python.vision.core.image import Image, ImageFormat
+    from mediapipe.python import Image, ImageFormat
     MEDIAPIPE_AVAILABLE = True
 except ImportError as e:
     MEDIAPIPE_AVAILABLE = False

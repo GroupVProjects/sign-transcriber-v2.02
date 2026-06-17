@@ -1,5 +1,14 @@
 import os
 from datetime import timedelta
+from pathlib import Path
+
+# Load .env automatically when config is imported so scripts and CLI commands
+# can discover DATABASE_URL in local development and in deployment pipelines.
+from dotenv import load_dotenv
+base_dir = Path(__file__).resolve().parent
+dotenv_path = base_dir / '.env'
+if dotenv_path.exists():
+    load_dotenv(dotenv_path)
 
 # ============================================================================
 # ENVIRONMENT DETECTION
