@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField
+from wtforms import StringField, PasswordField, SubmitField, SelectField, TextAreaField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Length
 from models import User
 
@@ -114,3 +114,26 @@ class TranscriptForm(FlaskForm):
         DataRequired()
     ])
     submit = SubmitField('Save Transcript')
+
+
+class SignDatasetForm(FlaskForm):
+    """Form for creating/editing sign datasets."""
+    sign_name = StringField('Sign Name', validators=[
+        DataRequired(),
+        Length(min=1, max=100)
+    ])
+    description = TextAreaField('Description', validators=[
+        Length(max=500)
+    ])
+    gesture_type = SelectField('Type', choices=[
+        ('letter', 'Letter'),
+        ('number', 'Number'),
+        ('phrase', 'Phrase')
+    ], validators=[DataRequired()])
+    image_url = StringField('Image URL', validators=[
+        Length(max=500)
+    ])
+    video_url = StringField('Video URL', validators=[
+        Length(max=500)
+    ])
+    submit = SubmitField('Save Dataset')

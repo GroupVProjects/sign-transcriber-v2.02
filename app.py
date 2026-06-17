@@ -1,9 +1,8 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 
 # CRITICAL: Load environment variables FIRST before any config is imported
-import sys
 if os.path.exists('.env'):
     with open('.env', 'r') as f:
         for line in f:
@@ -12,13 +11,13 @@ if os.path.exists('.env'):
                 key, value = line.split('=', 1)
                 os.environ[key.strip()] = value.strip()
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_file, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
-from sqlalchemy import inspect
+from sqlalchemy import inspect, or_
 from werkzeug.utils import secure_filename
 from models import db, User, Transcript, AuditLog, SignDataset, Recording
-from forms import RegistrationForm, LoginForm, CreateUserForm, EditUserForm, TranscriptForm
+from forms import RegistrationForm, LoginForm, CreateUserForm, EditUserForm, TranscriptForm, SignDatasetForm
 from sign_detector import initialize_detector
 from export_utils import TranscriptExporter, get_export_options
 from config import *
@@ -34,14 +33,26 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
-# Initialize sign detector (real-time hand tracking with MediaPipe)
-sign_detector = initialize_detector()
+# Initialize sign detector lazily so startup is resilient if the model is unavailable
+sign_detector = None
+
+
+def get_sign_detector():
+    """Initialize the detector once and return a reusable instance."""
+    global sign_detector
+    if sign_detector is None:
+        try:
+            sign_detector = initialize_detector()
+        except Exception as exc:
+            app.logger.exception('Failed to initialize sign detector: %s', exc)
+            return None
+    return sign_detector
 
 
 @login_manager.user_loader
 def load_user(user_id):
     """Load user from database"""
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 def admin_required(f):
@@ -137,9 +148,18 @@ def register():
 
     form = RegistrationForm()
     if form.validate_on_submit():
-        # Allow admin registration - remove the restriction for now
-        selected_role = form.role.data
+        # Prevent duplicate accounts from causing database errors.
+        existing_user = User.query.filter(
+            or_(
+                User.username == form.username.data,
+                User.email == form.email.data
+            )
+        ).first()
+        if existing_user:
+            flash('A user with that username or email already exists.', 'danger')
+            return render_template('auth/register.html', form=form)
 
+        selected_role = form.role.data
         user = User(
             username=form.username.data,
             email=form.email.data,
@@ -175,7 +195,7 @@ def login():
             return redirect(url_for('login'))
         
         login_user(user)
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.session.commit()
         
         next_page = request.args.get('next')
@@ -261,7 +281,7 @@ def view_transcript(transcript_id):
     if form.validate_on_submit():
         transcript.title = form.title.data
         transcript.content = form.content.data
-        transcript.updated_at = datetime.utcnow()
+        transcript.updated_at = datetime.now(timezone.utc)
         db.session.commit()
         
         flash('Transcript updated successfully!', 'success')
@@ -631,6 +651,70 @@ def manage_datasets():
                          current_gesture=gesture_filter)
 
 
+@app.route('/admin/datasets/create', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def create_dataset():
+    """Create a sign dataset entry."""
+    form = SignDatasetForm()
+    if form.validate_on_submit():
+        dataset = SignDataset(
+            sign_name=form.sign_name.data.strip(),
+            description=form.description.data.strip() or None,
+            gesture_type=form.gesture_type.data,
+            image_url=form.image_url.data.strip() or None,
+            video_url=form.video_url.data.strip() or None
+        )
+        db.session.add(dataset)
+        db.session.commit()
+        log_audit('CREATE_DATASET', 'dataset', dataset.id, f"Created dataset {dataset.sign_name}")
+        flash('Dataset created successfully!', 'success')
+        return redirect(url_for('manage_datasets'))
+    return render_template('admin/create_dataset.html', form=form)
+
+
+@app.route('/admin/datasets/<int:dataset_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_dataset(dataset_id):
+    """Edit a sign dataset entry."""
+    dataset = SignDataset.query.get_or_404(dataset_id)
+    form = SignDatasetForm()
+
+    if form.validate_on_submit():
+        dataset.sign_name = form.sign_name.data.strip()
+        dataset.description = form.description.data.strip() or None
+        dataset.gesture_type = form.gesture_type.data
+        dataset.image_url = form.image_url.data.strip() or None
+        dataset.video_url = form.video_url.data.strip() or None
+        db.session.commit()
+        log_audit('UPDATE_DATASET', 'dataset', dataset.id, f"Updated dataset {dataset.sign_name}")
+        flash('Dataset updated successfully!', 'success')
+        return redirect(url_for('manage_datasets'))
+
+    elif request.method == 'GET':
+        form.sign_name.data = dataset.sign_name
+        form.description.data = dataset.description
+        form.gesture_type.data = dataset.gesture_type
+        form.image_url.data = dataset.image_url
+        form.video_url.data = dataset.video_url
+
+    return render_template('admin/edit_dataset.html', dataset=dataset, form=form)
+
+
+@app.route('/admin/datasets/<int:dataset_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_dataset(dataset_id):
+    """Delete a sign dataset entry."""
+    dataset = SignDataset.query.get_or_404(dataset_id)
+    db.session.delete(dataset)
+    db.session.commit()
+    log_audit('DELETE_DATASET', 'dataset', dataset_id, f"Deleted dataset {dataset.sign_name}")
+    flash('Dataset deleted successfully!', 'success')
+    return redirect(url_for('manage_datasets'))
+
+
 @app.route('/admin/audit-logs')
 @login_required
 @admin_required
@@ -665,6 +749,15 @@ def api_transcribe():
     Only responds when hands are actually detected in the frame
     """
     try:
+        detector = get_sign_detector()
+        if detector is None:
+            return jsonify({
+                'status': 'error',
+                'message': 'Hand detector is not available right now.',
+                'hands_detected': 0,
+                'detected_sign': None
+            }), 503
+
         # Check if frame data is provided
         if 'frame' not in request.files:
             return jsonify({
@@ -676,11 +769,17 @@ def api_transcribe():
         
         # Read frame from request
         frame_file = request.files['frame']
-        frame_stream = frame_file.stream
-        frame_data = frame_stream.read()
+        frame_data = frame_file.read()
+        if not frame_data:
+            return jsonify({
+                'status': 'no_hand',
+                'message': 'Empty frame data',
+                'hands_detected': 0,
+                'detected_sign': None
+            }), 200
         
         # Detect hand gestures in frame
-        detection = sign_detector.detect_signs(frame_data)
+        detection = detector.detect_signs(frame_data)
         
         # Only return gesture data if hands were detected
         if detection['has_hands']:
@@ -726,16 +825,18 @@ def api_upload_recording():
             return jsonify({'status': 'error', 'message': 'No selected video file'}), 400
 
         title = request.form.get('title', 'Recorded Gesture Session')
-        duration = request.form.get('duration', '0')
+        duration_value = request.form.get('duration', '0')
+        duration = int(duration_value) if str(duration_value).isdigit() else 0
 
         recordings_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'], 'recordings')
         os.makedirs(recordings_dir, exist_ok=True)
 
         safe_name = secure_filename(video_file.filename)
         if not safe_name:
-            safe_name = f"gesture_{current_user.id}_{int(datetime.utcnow().timestamp())}.webm"
+            safe_name = f"gesture_{current_user.id}_{int(datetime.now(timezone.utc).timestamp())}.webm"
 
-        filename = f"{current_user.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{safe_name}"
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        filename = f"{current_user.id}_{timestamp}_{safe_name}"
         file_path = os.path.join(recordings_dir, filename)
         video_file.save(file_path)
 
@@ -745,7 +846,7 @@ def api_upload_recording():
             file_name=filename,
             file_path=file_path,
             mime_type=video_file.mimetype or 'video/webm',
-            duration=int(duration) if duration.isdigit() else 0,
+            duration=duration,
             status='ready'
         )
         db.session.add(recording)
@@ -766,7 +867,7 @@ def api_upload_recording():
 @login_required
 def api_start_session():
     """Start a transcription session"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     transcript = Transcript(
         user_id=current_user.id,
@@ -792,7 +893,7 @@ def api_save_session(session_id):
     if transcript.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     transcript.content = data.get('content', '')
     transcript.raw_content = data.get('raw_content', [])
     transcript.confidence_scores = data.get('confidence_scores', [])
