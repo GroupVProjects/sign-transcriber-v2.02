@@ -85,6 +85,35 @@ class Transcript(db.Model):
         return f'<Transcript {self.id} by {self.user.username}>'
 
 
+class Recording(db.Model):
+    """Recorded webcam gesture sessions for review and admin monitoring."""
+    __tablename__ = 'recordings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id'),
+        nullable=False,
+        index=True
+    )
+    title = db.Column(db.String(255), nullable=False)
+    file_name = db.Column(db.String(255), nullable=False, unique=True)
+    file_path = db.Column(db.String(500), nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False, default='video/webm')
+    duration = db.Column(db.Integer, nullable=True)
+    status = db.Column(db.String(30), nullable=False, default='ready')
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        index=True
+    )
+
+    user = db.relationship('User', backref=db.backref('recordings', lazy=True))
+
+    def __repr__(self):
+        return f'<Recording {self.id} by user {self.user_id}>'
+
+
 class SignDataset(db.Model):
     """Sign dataset model for managing sign language vocabulary"""
     __tablename__ = 'sign_dataset'

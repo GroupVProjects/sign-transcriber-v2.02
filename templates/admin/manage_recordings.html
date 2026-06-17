@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Recordings - Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 40px 20px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Recorded Gesture Videos</h1>
+    </div>
+
+    {% if recordings.items %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>User</th>
+                        <th>Video</th>
+                        <th>Duration</th>
+                        <th>Uploaded</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for recording in recordings.items %}
+                        <tr>
+                            <td>{{ recording.id }}</td>
+                            <td>{{ recording.title }}</td>
+                            <td>{{ recording.user.username }}</td>
+                            <td>
+                                <a href="{{ url_for('serve_recording_file', filename=recording.file_name) }}" target="_blank">
+                                    View Video
+                                </a>
+                            </td>
+                            <td>{{ recording.duration or 0 }} sec</td>
+                            <td>{{ recording.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if recordings.pages > 1 %}
+            <nav>
+                <ul class="pagination">
+                    {% for page_num in recordings.iter_pages() %}
+                        {% if page_num %}
+                            <li class="page-item {% if page_num == recordings.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('manage_recordings', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">No recordings have been saved yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

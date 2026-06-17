@@ -12,11 +12,12 @@ if os.path.exists('.env'):
                 key, value = line.split('=', 1)
                 os.environ[key.strip()] = value.strip()
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_file, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 from sqlalchemy import inspect
-from models import db, User, Transcript, AuditLog, SignDataset
+from werkzeug.utils import secure_filename
+from models import db, User, Transcript, AuditLog, SignDataset, Recording
 from forms import RegistrationForm, LoginForm, CreateUserForm, EditUserForm, TranscriptForm
 from sign_detector import initialize_detector
 from export_utils import TranscriptExporter, get_export_options
@@ -30,7 +31,7 @@ app.config.from_object('config')
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'
+login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
 # Initialize sign detector (real-time hand tracking with MediaPipe)
@@ -526,6 +527,32 @@ def manage_transcripts():
                          current_status=status_filter)
 
 
+@app.route('/admin/recordings')
+@login_required
+@admin_required
+def manage_recordings():
+    """View all recorded gesture videos for admin review."""
+    page = request.args.get('page', 1, type=int)
+    recordings = Recording.query.order_by(Recording.created_at.desc()).paginate(
+        page=page,
+        per_page=15
+    )
+    return render_template('admin/manage_recordings.html', recordings=recordings)
+
+
+@app.route('/recordings/<path:filename>')
+@login_required
+def serve_recording_file(filename):
+    """Serve saved recording videos to authorized users."""
+    recordings_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'], 'recordings')
+    recording = Recording.query.filter_by(file_name=filename).first_or_404()
+
+    if recording.user_id != current_user.id and not current_user.is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    return send_from_directory(recordings_dir, filename)
+
+
 @app.route('/admin/transcripts/<int:transcript_id>/flag', methods=['POST'])
 @login_required
 @admin_required
@@ -684,6 +711,55 @@ def api_transcribe():
             'message': str(e),
             'hands_detected': 0
         }), 500
+
+
+@app.route('/api/upload-recording', methods=['POST'])
+@login_required
+def api_upload_recording():
+    """Save a recorded gesture video to the project and track it in the database."""
+    try:
+        if 'video' not in request.files:
+            return jsonify({'status': 'error', 'message': 'No video file provided'}), 400
+
+        video_file = request.files['video']
+        if video_file.filename == '':
+            return jsonify({'status': 'error', 'message': 'No selected video file'}), 400
+
+        title = request.form.get('title', 'Recorded Gesture Session')
+        duration = request.form.get('duration', '0')
+
+        recordings_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'], 'recordings')
+        os.makedirs(recordings_dir, exist_ok=True)
+
+        safe_name = secure_filename(video_file.filename)
+        if not safe_name:
+            safe_name = f"gesture_{current_user.id}_{int(datetime.utcnow().timestamp())}.webm"
+
+        filename = f"{current_user.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{safe_name}"
+        file_path = os.path.join(recordings_dir, filename)
+        video_file.save(file_path)
+
+        recording = Recording(
+            user_id=current_user.id,
+            title=title,
+            file_name=filename,
+            file_path=file_path,
+            mime_type=video_file.mimetype or 'video/webm',
+            duration=int(duration) if duration.isdigit() else 0,
+            status='ready'
+        )
+        db.session.add(recording)
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'recording_id': recording.id,
+            'message': 'Video recording saved successfully',
+            'file_url': url_for('serve_recording_file', filename=filename)
+        }), 200
+    except Exception as e:
+        print(f"Error saving recording: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/start-session', methods=['POST'])
@@ -888,6 +964,7 @@ def ensure_database_initialized():
             required_tables = [
                 User.__tablename__,
                 Transcript.__tablename__,
+                Recording.__tablename__,
                 SignDataset.__tablename__,
                 AuditLog.__tablename__,
             ]

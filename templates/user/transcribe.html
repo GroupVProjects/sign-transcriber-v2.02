@@ -21,7 +21,9 @@
                 <button id="startBtn" class="btn btn-primary">START Start Recording</button>
                 <button id="stopBtn" class="btn btn-secondary" disabled>STOP Stop Recording</button>
                 <button id="clearBtn" class="btn btn-secondary">CLEAR Clear</button>
+                <button id="saveVideoBtn" class="btn btn-success" disabled>Save Video</button>
             </div>
+            <div id="recordingStatus" class="recording-status">No recording saved yet.</div>
         </div>
 
         <!-- Transcription Output Area -->
@@ -132,6 +134,12 @@
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.recording-status {
+    margin-top: 12px;
+    font-size: 0.95rem;
+    color: #6b7280;
 }
 
 .btn {
@@ -276,6 +284,8 @@
 <script>
 // Real-time Hand Gesture Detection with MediaPipe + Visual Tracking
 let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
 let isRecording = false;
 let detectionInterval = null;
 let detectedSigns = [];
@@ -288,9 +298,11 @@ const videoElement = document.getElementById('webcam');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
 const clearBtn = document.getElementById('clearBtn');
+const saveVideoBtn = document.getElementById('saveVideoBtn');
 const liveTranscription = document.getElementById('liveTranscription');
 const finalTranscript = document.getElementById('finalTranscript');
 const confidenceScore = document.getElementById('confidenceScore');
+const recordingStatus = document.getElementById('recordingStatus');
 
 // Canvas and rendering elements
 const canvasOverlay = document.createElement('canvas');
@@ -309,22 +321,40 @@ videoPreview.appendChild(canvasOverlay);
 startBtn.addEventListener('click', startRecording);
 stopBtn.addEventListener('click', stopRecording);
 clearBtn.addEventListener('click', clearTranscription);
+saveVideoBtn.addEventListener('click', saveRecordedVideo);
 
 async function startRecording() {
     try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: 'user' },
-            audio: false 
+            audio: true 
         });
         videoElement.srcObject = mediaStream;
         
+        recordedChunks = [];
         isRecording = true;
         startBtn.disabled = true;
         stopBtn.disabled = false;
+        saveVideoBtn.disabled = true;
+        recordingStatus.textContent = 'Recording live session...';
         liveTranscription.textContent = 'Waiting for hand gestures...';
         liveTranscription.style.color = '#9ca3af';
         detectedSigns = [];
         lastDetectionTime = 0;
+        
+        if (typeof MediaRecorder !== 'undefined' && mediaStream) {
+            mediaRecorder = new MediaRecorder(mediaStream, {
+                mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                    ? 'video/webm;codecs=vp9'
+                    : 'video/webm'
+            });
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            mediaRecorder.start();
+        }
         
         // Wait for video to load then start
         videoElement.addEventListener('loadedmetadata', () => {
@@ -348,6 +378,9 @@ function setupCanvasOverlay() {
 }
 
 function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
     if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
     }
@@ -355,6 +388,8 @@ function stopRecording() {
     isRecording = false;
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    saveVideoBtn.disabled = false;
+    recordingStatus.textContent = 'Session stopped. Save the video to store it.';
     
     if (detectionInterval) {
         clearInterval(detectionInterval);
@@ -368,6 +403,43 @@ function stopRecording() {
     
     liveTranscription.style.color = '#374151';
     compileFinalTranscript();
+}
+
+async function saveRecordedVideo() {
+    if (!recordedChunks.length) {
+        alert('No recording available to save.');
+        return;
+    }
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const fileName = `gesture_${Date.now()}.webm`;
+    const formData = new FormData();
+    formData.append('video', blob, fileName);
+    formData.append('title', finalTranscript.value || `Recorded gesture ${new Date().toLocaleString()}`);
+    formData.append('duration', Math.max(1, Math.round(recordedChunks.length / 10)));
+
+    try {
+        saveVideoBtn.disabled = true;
+        recordingStatus.textContent = 'Saving recording...';
+        const response = await fetch('/api/upload-recording', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            recordingStatus.textContent = 'Recording saved successfully.';
+            alert('Recording saved successfully.');
+        } else {
+            throw new Error(data.message || 'Failed to save recording');
+        }
+    } catch (error) {
+        console.error('Error saving recording:', error);
+        recordingStatus.textContent = 'Failed to save recording.';
+        alert(error.message);
+    } finally {
+        saveVideoBtn.disabled = false;
+    }
 }
 
 // Hand skeleton connections (MediaPipe 21-point hand model)
